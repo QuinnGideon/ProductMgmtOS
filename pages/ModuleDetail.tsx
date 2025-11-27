@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { db, generateId } from '../db';
 import { useParams, Link } from 'react-router-dom';
@@ -171,7 +172,7 @@ export default function ModuleDetail() {
              <div className="space-y-6">
                 <Card>
                   <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
-                  <CardContent>{synthesis.summaryText}</CardContent>
+                  <CardContent>{synthesis.summaryText || "Summary not available."}</CardContent>
                 </Card>
 
                 <div className="grid md:grid-cols-2 gap-6">
@@ -179,7 +180,8 @@ export default function ModuleDetail() {
                      <CardHeader><CardTitle>Key Takeaways</CardTitle></CardHeader>
                      <CardContent>
                        <ul className="list-disc pl-5 space-y-2">
-                         {synthesis.keyTakeaways.map((k, i) => <li key={i}>{k}</li>)}
+                         {synthesis.keyTakeaways?.map((k, i) => <li key={i}>{k}</li>)}
+                         {!synthesis.keyTakeaways?.length && <li>No takeaways generated.</li>}
                        </ul>
                      </CardContent>
                    </Card>
@@ -187,12 +189,13 @@ export default function ModuleDetail() {
                      <CardHeader><CardTitle>Practical Applications</CardTitle></CardHeader>
                      <CardContent>
                        <ul className="list-check pl-0 space-y-2">
-                         {synthesis.practicalApplications.map((k, i) => (
+                         {synthesis.practicalApplications?.map((k, i) => (
                            <li key={i} className="flex gap-2">
                              <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                              <span>{k}</span>
                            </li>
                          ))}
+                         {!synthesis.practicalApplications?.length && <li>No applications generated.</li>}
                        </ul>
                      </CardContent>
                    </Card>
@@ -201,12 +204,13 @@ export default function ModuleDetail() {
                 <Card className="print:break-inside-avoid">
                   <CardHeader><CardTitle>Comprehension Check</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
-                     {synthesis.comprehensionQuestions.map((q, i) => (
+                     {synthesis.comprehensionQuestions?.map((q, i) => (
                        <div key={i} className="bg-muted/50 p-4 rounded-md">
                          <p className="font-medium">Q{i+1}: {q}</p>
                          <p className="text-sm text-muted-foreground mt-2 italic hover:not-italic cursor-help transition-all no-print">Hover for answer (Simulated)</p>
                        </div>
                      ))}
+                     {!synthesis.comprehensionQuestions?.length && <p>No questions generated.</p>}
                   </CardContent>
                 </Card>
              </div>

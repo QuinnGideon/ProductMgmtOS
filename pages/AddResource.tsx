@@ -101,7 +101,7 @@ export default function AddResource() {
       
       // Try to guess time
       const wordCount = content.split(' ').length;
-      const readingTime = Math.ceil(wordCount / 200); // 200 wpm
+      const readingTime = Math.max(1, Math.ceil(wordCount / 200)); // Ensure at least 1 minute
       if (readingTime > 0) setManualMinutes(readingTime);
 
       setSuccessMessage("Content fetched successfully! Verify details below.");

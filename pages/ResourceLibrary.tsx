@@ -1,11 +1,13 @@
 
 import React from 'react';
-import { db } from '../db';
+import { db, lookupId } from '../db';
 import { Input, Badge, Button, Dialog } from '../components/ui';
-import { Search, ExternalLink, Edit, Trash2, Save, X, Filter } from 'lucide-react';
+import { Search, ExternalLink, Edit, Trash2, Save, X, Filter, FileText } from 'lucide-react';
 import { Resource, ContentType, Difficulty, Status } from '../types';
+import { useToast } from '../components/Toast';
 
 export default function ResourceLibrary() {
+  const { toast } = useToast();
   // Fetch moduleResources as well to handle cascading deletes
   const { isLoading, data } = db.useQuery({ resources: {}, moduleResources: {} });
   
@@ -16,6 +18,9 @@ export default function ResourceLibrary() {
   // Edit State
   const [editingResource, setEditingResource] = React.useState<Resource | null>(null);
   const [editForm, setEditForm] = React.useState<Partial<Resource>>({});
+
+  // Delete State
+  const [resourceToDelete, setResourceToDelete] = React.useState<string | null>(null);
 
   const querySearch = new URLSearchParams(location.hash.split('?')[1]).get('search');
   
@@ -34,18 +39,43 @@ export default function ResourceLibrary() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this resource? This action cannot be undone and will remove it from all modules.')) {
+  // Helper to check if ID is a valid UUID (standard InstantDB format)
+  const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  const confirmDelete = () => {
+    if (!resourceToDelete) return;
+    
+    const id = resourceToDelete;
+    try {
       // Find related module connections
       const relatedLinks = data.moduleResources.filter(mr => mr.resourceId === id);
       
-      // Create transaction steps
-      const txs = [
-        db.tx.resources[id].delete(),
-        ...relatedLinks.map(mr => db.tx.moduleResources[mr.id].delete())
-      ];
+      const txs = [];
+
+      // 1. Delete the Resource
+      if (isUuid(id)) {
+        txs.push(db.tx.resources[id].delete());
+      } else {
+        // Handle legacy data with non-UUID ids
+        txs.push(db.tx.resources[lookupId('id', id)].delete());
+      }
+
+      // 2. Delete Relations (Cascading)
+      relatedLinks.forEach(mr => {
+        if (isUuid(mr.id)) {
+          txs.push(db.tx.moduleResources[mr.id].delete());
+        } else {
+          txs.push(db.tx.moduleResources[lookupId('id', mr.id)].delete());
+        }
+      });
       
       db.transact(txs);
+      toast("Resource deleted successfully", "success");
+    } catch (e) {
+      console.error("Delete error:", e);
+      toast("Failed to delete resource. Check console.", "error");
+    } finally {
+      setResourceToDelete(null);
     }
   };
 
@@ -56,8 +86,25 @@ export default function ResourceLibrary() {
 
   const handleSaveEdit = () => {
     if (editingResource && editForm) {
-      db.transact(db.tx.resources[editingResource.id].update(editForm));
-      setEditingResource(null);
+      try {
+        // Clean up extracted content if it's just empty space
+        const cleanForm = {
+            ...editForm,
+            extractedContent: editForm.extractedContent?.trim() || undefined
+        };
+        
+        // Use lookup for update if legacy ID
+        if (isUuid(editingResource.id)) {
+           db.transact(db.tx.resources[editingResource.id].update(cleanForm));
+        } else {
+           db.transact(db.tx.resources[lookupId('id', editingResource.id)].update(cleanForm));
+        }
+
+        setEditingResource(null);
+        toast("Resource updated successfully", "success");
+      } catch (e) {
+        toast("Failed to update resource", "error");
+      }
     }
   };
 
@@ -139,17 +186,21 @@ export default function ResourceLibrary() {
                   </td>
                   <td className="p-4 align-middle text-right">
                     <div className="flex justify-end gap-1">
-                      {resource.url && (
+                      {resource.url ? (
                         <Button variant="ghost" size="icon" asChild title="Open Link">
                           <a href={resource.url} target="_blank" rel="noreferrer">
                             <ExternalLink className="h-4 w-4" />
                           </a>
                         </Button>
+                      ) : (
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(resource)} title="Read Content">
+                           <FileText className="h-4 w-4" />
+                        </Button>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => openEdit(resource)} title="Edit Resource">
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(resource.id)} className="text-muted-foreground hover:text-destructive" title="Delete">
+                      <Button variant="ghost" size="icon" onClick={() => setResourceToDelete(resource.id)} className="text-muted-foreground hover:text-destructive" title="Delete">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -250,6 +301,18 @@ export default function ResourceLibrary() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-medium">Topics (comma separated)</label>
+                <Input 
+                  value={editForm.topics?.join(', ') || ''}
+                  onChange={(e) => setEditForm({
+                    ...editForm, 
+                    topics: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                  })}
+                  placeholder="product, discovery, analytics"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Extracted Content / Notes</label>
                 <textarea 
                   className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -268,6 +331,29 @@ export default function ResourceLibrary() {
               </div>
             </div>
           )}
+        </div>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog isOpen={!!resourceToDelete} onClose={() => setResourceToDelete(null)}>
+        <div className="p-6 max-w-sm">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center text-destructive">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <h3 className="text-lg font-bold">Delete Resource?</h3>
+            <p className="text-muted-foreground text-sm">
+              Are you sure you want to delete this? This action cannot be undone and will remove it from any assigned modules.
+            </p>
+            <div className="flex gap-2 w-full pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setResourceToDelete(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" className="flex-1" onClick={confirmDelete}>
+                Delete
+              </Button>
+            </div>
+          </div>
         </div>
       </Dialog>
     </div>

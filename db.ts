@@ -1,4 +1,4 @@
-import { init, id } from '@instantdb/react';
+import { init, id, lookup } from '@instantdb/react';
 import { Schema } from './types';
 
 // Using a demo app ID. In production, this would be a real ID.
@@ -8,3 +8,6 @@ export const db = init<Schema>({ appId: APP_ID });
 
 // Helper to generate IDs (InstantDB requires UUIDs)
 export const generateId = id;
+
+// Helper to lookup entities by ID (useful for legacy/non-UUID ids)
+export const lookupId = lookup;

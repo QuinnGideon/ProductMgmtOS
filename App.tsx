@@ -11,6 +11,7 @@ import AddResource from './pages/AddResource';
 import SettingsPage from './pages/Settings';
 import { db, generateId } from './db';
 import { Button, Card, CardContent, CardHeader, CardTitle } from './components/ui';
+import { ToastProvider } from './components/Toast';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
 // Seed data function for demo purposes
@@ -156,21 +157,25 @@ export default function App() {
   }
 
   return (
-    <Router>
-      <SeedData />
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/tracks" element={<Tracks />} />
-          <Route path="/curriculum" element={<Curriculum />} />
-          <Route path="/modules/:id" element={<ModuleDetail />} />
-          <Route path="/library" element={<ResourceLibrary />} />
-          <Route path="/insights" element={<Insights />} />
-          <Route path="/add" element={<AddResource />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Layout>
-    </Router>
+    <ToastProvider>
+      <Router>
+        <div>
+          <SeedData />
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/tracks" element={<Tracks />} />
+              <Route path="/curriculum" element={<Curriculum />} />
+              <Route path="/modules/:id" element={<ModuleDetail />} />
+              <Route path="/library" element={<ResourceLibrary />} />
+              <Route path="/insights" element={<Insights />} />
+              <Route path="/add" element={<AddResource />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </Layout>
+        </div>
+      </Router>
+    </ToastProvider>
   );
 }
